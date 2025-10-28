@@ -2,7 +2,6 @@ name: Deploy to Render
 
 on:
   workflow_run:
-    # Trigger when the CD that builds/pushes the Docker image finishes
     workflows:
       - 'Publish image in Docker Hub'
     types:
@@ -10,7 +9,6 @@ on:
 
 jobs:
   deploy:
-    # Only run this job when the upstream workflow finished successfully
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Deploy to Render
     runs-on: ubuntu-latest
