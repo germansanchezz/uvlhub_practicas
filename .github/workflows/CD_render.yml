@@ -1,4 +1,3 @@
-jobs:
 name: Deploy to Render
 
 # Trigger this workflow when the Docker image publish workflow finishes.
