@@ -25,10 +25,6 @@ COPY migrations/ ./migrations
 # Copy requirements.txt into the working directory /app
 COPY requirements.txt .
 
-# Copy pyproject and package so pip can install the local project in editable mode
-COPY pyproject.toml .
-COPY rosemary/ ./rosemary
-
 # Removes cache at the build stage
 RUN find . -type d -name "__pycache__" -exec rm -r {} + && \
     find . -type f -name "*.pyc" -exec rm -f {} +
