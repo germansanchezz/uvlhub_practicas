@@ -1,0 +1,27 @@
+name: Deploy to Render
+
+on:
+  workflow_run:
+    # Trigger when the CD that builds/pushes the Docker image finishes
+    workflows:
+      - 'Publish image in Docker Hub'
+    types:
+      - completed
+
+jobs:
+  deploy:
+    # Only run this job when the upstream workflow finished successfully
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Render (deploy from Docker Hub)
+        env:
+          deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          curl -sS "$deploy_url" || (echo "Failed to call render hook" && exit 1)
+
+      - name: Log trigger info
+        run: |
+          echo "Triggered by workflow: ${{ github.event.workflow_run.name }}"
+          echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
