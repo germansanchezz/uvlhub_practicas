@@ -24,6 +24,8 @@ COPY migrations/ ./migrations
 COPY scripts/wait-for-db.sh /app/scripts/wait-for-db.sh
 RUN chmod +x /app/scripts/wait-for-db.sh || true
 
+RUN echo "webhook" > /app/.moduleignore
+
 # EntryPoint Railway
 COPY docker/entrypoints/railway_entrypoint.sh /app/railway_entrypoint.sh
 RUN chmod +x /app/railway_entrypoint.sh
