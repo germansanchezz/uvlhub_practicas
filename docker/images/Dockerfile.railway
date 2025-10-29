@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim
+
+# Paquetes del sistema necesarios (mariadb-client para migraciones)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    mariadb-client gcc libc-dev python3-dev libffi-dev curl bash build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Copia de dependencias primero (mejor cacheo)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copia del código
+COPY app/ ./app
+COPY core/ ./core
+COPY migrations/ ./migrations
+
+# Script(s) de arranque y utilidades
+COPY scripts/wait-for-db.sh /app/scripts/wait-for-db.sh
+RUN chmod +x /app/scripts/wait-for-db.sh || true
+
+# ENTRYPOINT específico de Railway
+COPY docker/entrypoints/railway_entrypoint.sh /app/railway_entrypoint.sh
+RUN chmod +x /app/railway_entrypoint.sh
+
+# Limpieza de __pycache__ en build
+RUN find . -type d -name "__pycache__" -exec rm -r {} + || true \
+    && find . -type f -name "*.pyc" -exec rm -f {} + || true
+
+# Exponer (no obligatorio para Railway, pero informativo)
+EXPOSE 8080
+
+# Importante: que el servicio arranque con este script
+ENTRYPOINT ["/app/railway_entrypoint.sh"]
