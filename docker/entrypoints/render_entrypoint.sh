@@ -15,6 +15,15 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
+# Sync uploads folder with Git repository
+if [ -n "$UPLOADS_GIT_REPO_URL" ]; then
+    echo "Synchronizing uploads folder..."
+    sh /app/scripts/sync_uploads.sh
+else
+    echo "UPLOADS_GIT_REPO_URL not set, skipping uploads sync"
+    mkdir -p "${WORKING_DIR}uploads"
+fi
+
 # Initialize migrations only if the migrations directory doesn't exist
 if [ ! -d "migrations/versions" ]; then
     # Initialize the migration repository
@@ -23,23 +32,15 @@ if [ ! -d "migrations/versions" ]; then
 fi
 
 # Check if the database is empty
-if [ $(mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD -h $MARIADB_HOSTNAME -P $MARIADB_PORT -D $MARIADB_DATABASE -sse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$MARIADB_DATABASE';") -eq 0 ]; then
- 
+TABLE_COUNT=$(mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD -h $MARIADB_HOSTNAME -P $MARIADB_PORT -D $MARIADB_DATABASE -sse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$MARIADB_DATABASE';")
+
+if [ "$TABLE_COUNT" -eq 0 ]; then
+    # If the database is empty, upgrade to the latest migration
     echo "Empty database, migrating..."
-
-    # Get the latest migration revision
-    LATEST_REVISION=$(ls -1 migrations/versions/*.py | grep -v "__pycache__" | sort -r | head -n 1 | sed 's/.*\/\(.*\)\.py/\1/')
-
-    echo "Latest revision: $LATEST_REVISION"
-
-    # Run the migration process to apply all database schema changes
     flask db upgrade
-
 else
-
-    echo "Database already initialized, updating migrations..."
-
-    # Get the current revision to avoid duplicate stamp
+    echo "Database already initialized, applying upgrades if any..."
+    # Get the current revision
     CURRENT_REVISION=$(mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD -h $MARIADB_HOSTNAME -P $MARIADB_PORT -D $MARIADB_DATABASE -sse "SELECT version_num FROM alembic_version LIMIT 1;")
     
     if [ -z "$CURRENT_REVISION" ]; then
