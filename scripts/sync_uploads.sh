@@ -13,24 +13,41 @@ GIT_REPO_URL="${UPLOADS_GIT_REPO_URL}"
 GIT_BRANCH="${UPLOADS_GIT_BRANCH:-main}"
 GIT_USER_NAME="${UPLOADS_GIT_USER_NAME:-UVLHub Bot}"
 GIT_USER_EMAIL="${UPLOADS_GIT_USER_EMAIL:-bot@uvlhub.io}"
+GITHUB_TOKEN="${UPLOADS_GITHUB_TOKEN}"
 
 echo "Starting uploads synchronization..."
+
+# Validate required variables
+if [ -z "$GIT_REPO_URL" ]; then
+    echo "Error: UPLOADS_GIT_REPO_URL is not set"
+    exit 1
+fi
+
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "Error: UPLOADS_GITHUB_TOKEN is not set"
+    exit 1
+fi
 
 # Configure Git
 git config --global user.name "$GIT_USER_NAME"
 git config --global user.email "$GIT_USER_EMAIL"
-git config --global credential.helper store
+
+# Build authenticated URL
+# Extract repo path from URL (e.g., germansanchezz/uvlhub_practicas_uploads.git)
+REPO_PATH=$(echo "$GIT_REPO_URL" | sed -E 's|https?://[^/]+/||')
+AUTH_URL="https://${GITHUB_TOKEN}@github.com/${REPO_PATH}"
 
 # Clone or pull the repository
 if [ ! -d "$UPLOADS_DIR/.git" ]; then
     echo "Cloning uploads repository..."
     rm -rf "$UPLOADS_DIR"
-    git clone "$GIT_REPO_URL" "$UPLOADS_DIR"
+    git clone "$AUTH_URL" "$UPLOADS_DIR"
     cd "$UPLOADS_DIR"
     git checkout "$GIT_BRANCH" 2>/dev/null || git checkout -b "$GIT_BRANCH"
 else
     echo "Pulling latest changes from uploads repository..."
     cd "$UPLOADS_DIR"
+    git remote set-url origin "$AUTH_URL"
     git pull origin "$GIT_BRANCH" || true
 fi
 
@@ -40,6 +57,7 @@ echo "Uploads folder synchronized successfully!"
 nohup bash -c '
 UPLOADS_DIR="'"$UPLOADS_DIR"'"
 GIT_BRANCH="'"$GIT_BRANCH"'"
+AUTH_URL="'"$AUTH_URL"'"
 
 cd "$UPLOADS_DIR"
 
@@ -58,10 +76,15 @@ while read -r directory events filename; do
         TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
         git commit -m "Auto-sync uploads: $TIMESTAMP"
         
-        # Push changes
-        git push origin "$GIT_BRANCH" || echo "Failed to push changes"
+        # Ensure remote URL is set correctly
+        git remote set-url origin "$AUTH_URL"
         
-        echo "Changes synchronized at $TIMESTAMP"
+        # Push changes
+        if git push origin "$GIT_BRANCH"; then
+            echo "Changes synchronized successfully at $TIMESTAMP"
+        else
+            echo "Failed to push changes at $TIMESTAMP"
+        fi
     fi
 done
 ' > /tmp/uploads-sync.log 2>&1 &
